@@ -49,15 +49,19 @@ class DailyWallpaper
     #
     def save_response
         @uri = @parsed_json["images"][0]["url"]
-        hash = @parsed_json["images"][0]["hsh"]
+        @hash = @parsed_json["images"][0]["hsh"]
         date = Date.strptime(@parsed_json["images"][0]["enddate"], '%Y%m%d').strftime
 
         begin
             @db.execute(
                 "INSERT INTO images " +
-                "( url, date, hash ) " +
+                "( url, date, hash, rawJson ) " +
                 "VALUES " +
-                "( '#{@uri.to_s}', '#{date.to_s}', '#{hash.to_s}' );"
+                "( ?, ?, ?, ? );",
+                @uri.to_s,
+                date.to_s,
+                hash.to_s,
+                @json.to_s
             )
         rescue SQLite3::ConstraintException => e
             close e.message
@@ -74,6 +78,7 @@ class DailyWallpaper
     # - id: integer - primary key - autoincrement - not null
     # - url: varchar(255) - not null
     # - hash: varchar(255) - unique - not null
+    # - rawJson: text - not null
     # - created_at: timestamp - default current_timestamp - not null
     #
     def create_table
@@ -83,6 +88,7 @@ class DailyWallpaper
                 "url VARCHAR(255) NOT NULL, " +
                 "hash VARCHAR(255) UNIQUE NOT NULL, " +
                 "date VARCHAR(10) UNIQUE NOT NULL, " +
+                "rawJson TEXT NOT NULL, " +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL " +
             ")"
         )
@@ -101,7 +107,11 @@ class DailyWallpaper
     # param::  json: string
     #
     def parse_json
-        @parsed_json = JSON.parse @json
+        begin
+            @parsed_json = JSON.parse @json
+        rescue JSON::ParserError => e
+            close e.message
+        end
     end
 
     ##
